@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: white;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            position: relative;
+        }
+        
+        .top-left {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 1.2rem;
+            color: #333;
+        }
+        
+        .top-right {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 1.2rem;
+            color: #333;
+        }
+        
+        .grey-stripe {
+            background-color: #dddddd;
+            width: 100%;
+            height: 60px; /* slim stripe */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 25vh; /* push it about 1/4 down the screen */
+        }
+        
+        .math-problem {
+            display: flex;
+            align-items: center;
+            font-size: 2rem;
+            font-weight: normal;
+            color: #000;
+        }
+        
+        .math-input {
+            width: 150px;
+            height: 50px;
+            font-size: 2rem;
+            text-align: left;
+            border: 1px solid #999;
+            border-radius: 3px;
+            padding: 5px 5px;
+            outline: none;
+            margin-left: 10px;
+        }
+        
+        .math-input:focus {
+            border: 1px solid #4a90e2; /* blue border like screenshot */
+            box-shadow: 0 0 2px #4a90e2;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-left">Seconds left: <span id="timer">120</span></div>
+    <div class="top-right">Score: <span id="score">0</span></div>
+    
+    <div class="grey-stripe">
+        <div class="math-problem">
+            <span id="equation">153 - 85 =</span>
+            <input type="text" id="answer" class="math-input" autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="numeric" pattern="[0-9]*">
+        </div>
+    </div>
+
+    <script>
+        // Timer
+        let timeLeft = 120;
+        const timerElement = document.getElementById('timer');
+        const countdown = setInterval(() => {
+            timeLeft--;
+            timerElement.textContent = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(countdown);
+                timerElement.textContent = '0';
+            }
+        }, 1000);
+
+        // Scoring
+        const equationEl = document.getElementById('equation');
+        const answerInput = document.getElementById('answer');
+        const scoreEl = document.getElementById('score');
+        let score = 0;
+        let answeredCorrectly = false;
+        let correctAnswer = NaN;
+
+        function getRandomIntInclusive(min, max) {
+            const mn = Math.ceil(min);
+            const mx = Math.floor(max);
+            return Math.floor(Math.random() * (mx - mn + 1)) + mn;
+        }
+
+        function generateProblem() {
+            // Randomly choose operation: subtraction, multiplication, or division
+            const ops = ['-', '×', '÷'];
+            const op = ops[Math.floor(Math.random() * ops.length)];
+
+            if (op === '-') {
+                const a = getRandomIntInclusive(2, 100);
+                const b = getRandomIntInclusive(2, 100);
+                const hi = Math.max(a, b);
+                const lo = Math.min(a, b);
+                equationEl.textContent = `${hi} - ${lo} =`;
+                correctAnswer = hi - lo;
+                return;
+            }
+
+            if (op === '×') {
+                const a = getRandomIntInclusive(2, 12);   // first number 2-12
+                const b = getRandomIntInclusive(2, 100);  // second number 2-100
+                equationEl.textContent = `${a} × ${b} =`;
+                correctAnswer = a * b;
+                return;
+            }
+
+            // Division: divisor 2–12, dividend is multiple of divisor, dividend ≤ 1200
+            let divisor = getRandomIntInclusive(2, 12);
+            let maxQuotient = Math.min(100, Math.floor(1200 / divisor));
+            // Ensure we can pick at least 2 as quotient; if not, retry divisor selection
+            while (maxQuotient < 2) {
+                divisor = getRandomIntInclusive(2, 12);
+                maxQuotient = Math.min(100, Math.floor(1200 / divisor));
+            }
+            const quotient = getRandomIntInclusive(2, maxQuotient);
+            const dividend = divisor * quotient;
+            equationEl.textContent = `${dividend} ÷ ${divisor} =`;
+            correctAnswer = quotient;
+        }
+
+        function parseEquation(text) {
+            // Supports: A - B =, A + B =, A × B =, A * B =, A ÷ B =, A / B =
+            const cleaned = text.replace('=', '').trim();
+            const ops = [
+                { sym: '+', re: /\+/ },
+                { sym: '-', re: /-/ },
+                { sym: '×', re: /×/ },
+                { sym: '*', re: /\*/ },
+                { sym: '÷', re: /÷/ },
+                { sym: '/', re: /\// },
+            ];
+            for (const { sym, re } of ops) {
+                if (re.test(cleaned)) {
+                    const parts = cleaned.split(re);
+                    const a = parseInt(parts[0].trim(), 10);
+                    const b = parseInt(parts[1].trim(), 10);
+                    if (Number.isNaN(a) || Number.isNaN(b)) return NaN;
+                    if (sym === '+') return a + b;
+                    if (sym === '-') return a - b;
+                    if (sym === '×' || sym === '*') return a * b;
+                    if (sym === '÷' || sym === '/') return Math.trunc(a / b);
+                }
+            }
+            return NaN;
+        }
+
+        // Initialize first answer from current markup, then immediately randomize
+        correctAnswer = parseEquation(equationEl.textContent);
+        generateProblem();
+
+        answerInput.addEventListener('input', () => {
+            if (answeredCorrectly) return;
+            const val = parseInt(answerInput.value.trim(), 10);
+            if (timeLeft <= 0) return;
+            if (!Number.isNaN(val) && val === correctAnswer) {
+                if (!answeredCorrectly) {
+                    score += 1;
+                    scoreEl.textContent = String(score);
+                    answeredCorrectly = true;
+                }
+                // Reset the input and keep focus
+                answerInput.value = '';
+                answerInput.focus();
+                // Generate next problem and allow scoring again
+                generateProblem();
+                answeredCorrectly = false;
+            }
+        });
+    </script>
+</body>
+</html>
